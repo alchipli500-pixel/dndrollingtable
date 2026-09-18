@@ -1,0 +1,776 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Rolling Table</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Spectral:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#120e0a;
+    --bg-2:#0c0906;
+    --panel:#1c1610;
+    --panel-2:#241c14;
+    --border:#3a2e1e;
+    --border-soft:#2a2118;
+    --gold:#c8a24d;
+    --gold-bright:#e8c876;
+    --text:#ece2cf;
+    --text-dim:#a4957c;
+    --text-faint:#6f6350;
+    --red:#a4443f;
+    --red-bright:#e0685f;
+    --shadow: 0 12px 30px rgba(0,0,0,.45);
+    --radius: 10px;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(1200px 700px at 15% -10%, #23190f 0%, transparent 60%),
+      radial-gradient(900px 600px at 100% 0%, #1a140c 0%, transparent 55%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.display{ font-family:'Spectral', serif; }
+  button{ font-family:inherit; }
+  ::selection{ background:var(--gold); color:#1a1408; }
+
+  .flagged{ position:relative; }
+  .flagged::before{
+    content:"";
+    position:absolute;
+    top:0; left:14px;
+    width:10px; height:16px;
+    background:var(--gold);
+    clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+    opacity:.85;
+  }
+
+  /* ================= LANDING ================= */
+  #landing{
+    min-height:100vh;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:32px 20px;
+  }
+  .landing-wrap{ width:100%; max-width:560px; text-align:center; }
+  .hero-die{ width:92px; height:92px; margin:0 auto 22px; position:relative; }
+  .hero-die svg{ width:100%; height:100%; filter:drop-shadow(0 8px 18px rgba(200,162,77,.25)); }
+  .landing-wrap h1{
+    font-size:clamp(28px,5vw,40px);
+    font-weight:700;
+    margin:0 0 8px;
+    letter-spacing:.3px;
+    color:var(--gold-bright);
+  }
+  .landing-sub{ color:var(--text-dim); font-size:15px; margin:0 0 34px; line-height:1.6; }
+  .mode-toggle{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:22px; }
+  .mode-btn{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    padding:18px 14px;
+    cursor:pointer;
+    color:var(--text);
+    text-align:left;
+    transition:border-color .15s, background .15s, transform .1s;
+  }
+  .mode-btn:hover{ border-color:var(--gold); transform:translateY(-1px); }
+  .mode-btn.active{
+    border-color:var(--gold);
+    background:linear-gradient(180deg, var(--panel-2), var(--panel));
+    box-shadow:0 0 0 1px rgba(200,162,77,.25) inset;
+  }
+  .mode-btn .mode-title{ font-weight:600; font-size:15px; display:block; margin-bottom:4px; }
+  .mode-btn .mode-desc{ font-size:12.5px; color:var(--text-dim); line-height:1.5; }
+  .mode-btn.active .mode-title{ color:var(--gold-bright); }
+
+  .field-group{ text-align:left; margin-bottom:14px; }
+  .field-group label{
+    display:block; font-size:12px; text-transform:uppercase; letter-spacing:.08em;
+    color:var(--text-faint); margin-bottom:6px;
+  }
+  .field-group input{
+    width:100%; background:var(--bg-2); border:1px solid var(--border); border-radius:8px;
+    padding:11px 13px; color:var(--text); font-size:15px; outline:none; transition:border-color .15s;
+  }
+  .field-group input:focus{ border-color:var(--gold); }
+  #room-field{ display:none; }
+
+  .enter-btn{
+    width:100%; margin-top:8px; background:var(--gold); color:#1c1408; border:none;
+    border-radius:8px; padding:13px 16px; font-size:15px; font-weight:600; cursor:pointer;
+    transition:background .15s, transform .1s;
+  }
+  .enter-btn:hover{ background:var(--gold-bright); }
+  .enter-btn:active{ transform:scale(.99); }
+
+  .landing-note{ margin-top:16px; font-size:12px; color:var(--text-faint); }
+  .conn-note{ margin-top:6px; font-size:11.5px; }
+  .conn-note.ok{ color:#8fd39d; }
+  .conn-note.bad{ color:var(--red-bright); }
+
+  /* ================= GAME SCREEN ================= */
+  #game{ display:none; min-height:100vh; padding:18px 18px 60px; }
+  .game-wrap{ max-width:920px; margin:0 auto; }
+
+  .topbar{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:22px; }
+  .topbar .title-block h1{ font-size:20px; margin:0 0 2px; color:var(--gold-bright); font-weight:700; }
+  .topbar .title-block .sub{ font-size:12.5px; color:var(--text-dim); }
+  .player-badge{
+    flex-shrink:0; width:52px; height:52px; border-radius:10px; background:var(--panel-2);
+    border:1px solid var(--border); display:flex; align-items:center; justify-content:center;
+    font-weight:700; font-size:16px; color:var(--gold-bright); cursor:default; position:relative;
+  }
+  .player-badge .pip{
+    position:absolute; top:-4px; right:-4px; width:12px; height:12px; border-radius:50%;
+    background:#5c9a6a; border:2px solid var(--bg);
+  }
+  .player-badge .pip.solo{ background:var(--text-faint); }
+  .player-badge .pip.offline{ background:var(--red-bright); }
+
+  .panel{
+    background:var(--panel); border:1px solid var(--border); border-radius:var(--radius);
+    padding:18px; margin-bottom:16px; box-shadow:var(--shadow);
+  }
+  .panel-label{
+    font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--text-faint);
+    margin:0 0 14px 12px; font-weight:600;
+  }
+
+  .dice-tray{ display:flex; flex-wrap:wrap; gap:12px; justify-content:space-between; }
+  .die-btn{
+    flex:1 1 0; min-width:70px; aspect-ratio:1/1; border:1px solid var(--border); background:var(--bg-2);
+    border-radius:12px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    position:relative; padding:6px; transition:transform .08s, box-shadow .15s;
+  }
+  .die-btn:hover{ transform:translateY(-2px); box-shadow:0 6px 14px rgba(0,0,0,.35); }
+  .die-btn:active{ transform:translateY(0) scale(.96); }
+  .die-btn svg{ width:70%; height:70%; }
+  .die-btn .count-chip{
+    position:absolute; top:-7px; right:-7px; background:var(--gold); color:#1c1408; font-size:11px;
+    font-weight:700; min-width:20px; height:20px; border-radius:10px; display:none; align-items:center;
+    justify-content:center; padding:0 5px; box-shadow:0 2px 6px rgba(0,0,0,.4);
+  }
+  .die-btn.has-count .count-chip{ display:flex; }
+
+  .selection-box{
+    min-height:56px; border:1px dashed var(--border); border-radius:10px; background:var(--bg-2);
+    padding:10px; display:flex; flex-wrap:wrap; align-items:center; gap:8px;
+  }
+  .selection-box.empty::after{
+    content:"Tap dice above to build your roll"; color:var(--text-faint); font-size:13px; padding:6px 4px;
+  }
+  .sel-chip{
+    display:flex; align-items:center; gap:6px; background:var(--panel-2); border:1px solid var(--border);
+    color:var(--text); padding:6px 6px 6px 12px; border-radius:999px; font-size:13px; font-weight:600;
+  }
+  .sel-chip button{
+    background:none; border:none; color:var(--text-faint); width:20px; height:20px; border-radius:50%;
+    cursor:pointer; font-size:13px; line-height:1;
+  }
+  .sel-chip button:hover{ background:var(--red); color:#fff; }
+
+  .selection-footer{ display:flex; justify-content:space-between; align-items:center; margin-top:12px; gap:10px; flex-wrap:wrap; }
+  .ghost-btn{
+    background:none; border:1px solid var(--border); color:var(--text-dim); padding:8px 14px;
+    border-radius:8px; cursor:pointer; font-size:13px;
+  }
+  .ghost-btn:hover{ border-color:var(--red-bright); color:var(--red-bright); }
+
+  .controls-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+  .mod-field{ display:flex; align-items:center; gap:8px; }
+  .mod-field label{ font-size:12px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em; }
+  .mod-field input{
+    width:64px; background:var(--bg-2); border:1px solid var(--border); color:var(--text); border-radius:8px;
+    padding:8px 8px; text-align:center; font-size:15px; font-weight:600;
+  }
+  .adv-group{ display:flex; gap:8px; }
+  .adv-btn{
+    background:var(--bg-2); border:1px solid var(--border); color:var(--text-dim); padding:9px 13px;
+    border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer; letter-spacing:.02em;
+  }
+  .adv-btn:hover{ border-color:var(--gold); }
+  .adv-btn.on-adv{ background:rgba(94,154,106,.16); border-color:#5e9a6a; color:#8fd39d; }
+  .adv-btn.on-dis{ background:rgba(164,68,63,.16); border-color:var(--red); color:var(--red-bright); }
+
+  .roll-btn{
+    margin-left:auto; background:linear-gradient(180deg, var(--gold-bright), var(--gold)); color:#1c1408;
+    border:none; border-radius:10px; padding:13px 30px; font-weight:700; font-size:15px; letter-spacing:.02em;
+    cursor:pointer; box-shadow:0 6px 16px rgba(200,162,77,.25); transition:transform .1s, box-shadow .15s;
+  }
+  .roll-btn:hover{ box-shadow:0 8px 20px rgba(200,162,77,.35); }
+  .roll-btn:active{ transform:scale(.97); }
+  .roll-btn:disabled{ opacity:.35; cursor:not-allowed; box-shadow:none; }
+
+  #result-panel{ display:none; }
+  .result-line{ font-family:'Spectral', serif; font-size:15px; color:var(--text-dim); margin-bottom:10px; }
+  .result-line b{ color:var(--gold-bright); font-weight:700; }
+  .result-total-row{ display:flex; gap:14px; flex-wrap:wrap; }
+  .result-card{ flex:1 1 180px; border-radius:10px; padding:16px; text-align:center; border:1px solid var(--border); background:var(--bg-2); }
+  .result-card .rc-label{ font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--text-faint); margin-bottom:6px; }
+  .result-card .rc-total{ font-size:34px; font-weight:700; font-family:'Spectral', serif; }
+  .result-card .rc-detail{ font-size:12px; color:var(--text-faint); margin-top:6px; }
+  .result-card.kept{ border-color:var(--gold); box-shadow:0 0 0 1px rgba(200,162,77,.35) inset; }
+  .result-card.kept .rc-total{ color:var(--gold-bright); }
+  .result-card.discarded{ border-color:var(--red); opacity:.75; }
+  .result-card.discarded .rc-total{ color:var(--red-bright); text-decoration:line-through; text-decoration-color:rgba(224,104,95,.6); }
+  .result-card.discarded .rc-label{ color:var(--red-bright); }
+
+  #log-panel .panel-label{ display:flex; justify-content:space-between; align-items:center; margin-right:8px;}
+  .log-count{ color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0; }
+  .log-table-wrap{ overflow-x:auto; }
+  table.log-table{ width:100%; border-collapse:collapse; font-size:13px; min-width:520px; }
+  table.log-table th{
+    text-align:left; color:var(--text-faint); font-weight:600; text-transform:uppercase; font-size:10.5px;
+    letter-spacing:.06em; padding:8px 10px; border-bottom:1px solid var(--border);
+  }
+  table.log-table td{ padding:9px 10px; border-bottom:1px solid var(--border-soft); color:var(--text); }
+  table.log-table tr:last-child td{ border-bottom:none; }
+  table.log-table td.total-cell{ font-weight:700; color:var(--gold-bright); font-family:'Spectral', serif; font-size:15px; }
+  table.log-table td.mono{ color:var(--text-dim); }
+  table.log-table tr.fresh-row{ animation: freshFade 1.6s ease-out; }
+  @keyframes freshFade{ from{ background:rgba(200,162,77,.22);} to{ background:transparent; } }
+  .empty-log{ padding:22px 10px; text-align:center; color:var(--text-faint); font-size:13px; }
+  .tag-adv{ color:#8fd39d; font-size:11px; margin-left:6px; }
+  .tag-dis{ color:var(--red-bright); font-size:11px; margin-left:6px; }
+
+  .leave-link{ display:inline-block; margin-top:6px; color:var(--text-faint); font-size:12.5px; text-decoration:underline; cursor:pointer; }
+  .leave-link:hover{ color:var(--text-dim); }
+
+  @media (max-width:520px){
+    .dice-tray{ justify-content:center; }
+    .die-btn{ min-width:58px; flex:1 1 22%; }
+    .roll-btn{ margin-left:0; width:100%; order:5; }
+    .controls-row{ align-items:stretch; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ============ LANDING ============ -->
+<div id="landing">
+  <div class="landing-wrap">
+    <div class="hero-die">
+      <svg viewBox="0 0 100 100"><polygon points="50,4 93,27 93,73 50,96 7,73 7,27" fill="none" stroke="#c8a24d" stroke-width="2.5"/><polygon points="50,4 93,27 50,50" fill="#2a2114" stroke="#c8a24d" stroke-width="1.4"/><polygon points="93,27 93,73 50,50" fill="#20190f" stroke="#c8a24d" stroke-width="1.4"/><polygon points="93,73 50,96 50,50" fill="#2a2114" stroke="#c8a24d" stroke-width="1.4"/><polygon points="50,96 7,73 50,50" fill="#1a150c" stroke="#c8a24d" stroke-width="1.4"/><polygon points="7,73 7,27 50,50" fill="#241c11" stroke="#c8a24d" stroke-width="1.4"/><polygon points="7,27 50,4 50,50" fill="#2e2415" stroke="#c8a24d" stroke-width="1.4"/><text x="50" y="56" text-anchor="middle" font-size="18" font-family="Spectral, serif" fill="#e8c876" font-weight="700">20</text></svg>
+    </div>
+    <h1>The Rolling Table</h1>
+    <p class="landing-sub">One tray of dice, two ways to play. Roll alone, or open a table others can join by name — synced live over Firebase.</p>
+
+    <div class="mode-toggle">
+      <button class="mode-btn active" id="mode-solo" type="button">
+        <span class="mode-title">Solo table</span>
+        <span class="mode-desc">Just you and the dice. Your rolls save on this device.</span>
+      </button>
+      <button class="mode-btn" id="mode-party" type="button">
+        <span class="mode-title">Shared table</span>
+        <span class="mode-desc">Name a room. Everyone who joins it sees rolls the instant they happen.</span>
+      </button>
+    </div>
+
+    <div class="field-group">
+      <label for="name-input">Your name</label>
+      <input id="name-input" type="text" placeholder="e.g.Name" maxlength="24" />
+    </div>
+
+    <div class="field-group" id="room-field">
+      <label for="room-input">Room name</label>
+      <input id="room-input" type="text" placeholder="e.g. dnd room" maxlength="28" />
+    </div>
+
+    <button class="enter-btn" id="enter-btn" type="button">Enter table</button>
+    <div class="landing-note" id="landing-note">Rolls are saved to this browser only.</div>
+    <div class="conn-note" id="conn-note"></div>
+  </div>
+</div>
+
+<!-- ============ GAME ============ -->
+<div id="game">
+  <div class="game-wrap">
+
+    <div class="topbar">
+      <div class="title-block">
+        <h1>The Rolling Table</h1>
+        <div class="sub" id="room-sub">Solo table</div>
+      </div>
+      <div class="player-badge" id="player-badge" title="">
+        --
+        <span class="pip solo" id="badge-pip"></span>
+      </div>
+    </div>
+
+    <div class="panel flagged">
+      <p class="panel-label">Dice tray</p>
+      <div class="dice-tray" id="dice-tray"></div>
+    </div>
+
+    <div class="panel flagged">
+      <p class="panel-label">Your roll</p>
+      <div class="selection-box empty" id="selection-box"></div>
+      <div class="selection-footer">
+        <button class="ghost-btn" id="clear-btn" type="button">Clear selection</button>
+      </div>
+    </div>
+
+    <div class="panel flagged">
+      <div class="controls-row">
+        <div class="mod-field">
+          <label for="modifier-input">Modifier</label>
+          <input id="modifier-input" type="number" value="0" step="1" />
+        </div>
+        <div class="adv-group">
+          <button class="adv-btn" id="adv-btn" type="button">Advantage</button>
+          <button class="adv-btn" id="dis-btn" type="button">Disadvantage</button>
+        </div>
+        <button class="roll-btn" id="roll-btn" type="button">Roll</button>
+      </div>
+    </div>
+
+    <div class="panel flagged" id="result-panel">
+      <p class="panel-label">Result</p>
+      <div class="result-line" id="result-line"></div>
+      <div class="result-total-row" id="result-total-row"></div>
+    </div>
+
+    <div class="panel flagged" id="log-panel">
+      <p class="panel-label"><span>Roll log</span><span class="log-count" id="log-count"></span></p>
+      <div class="log-table-wrap">
+        <table class="log-table" id="log-table">
+          <thead>
+            <tr><th>Time</th><th id="log-player-head">Player</th><th>Roll</th><th>Mod</th><th>Total</th></tr>
+          </thead>
+          <tbody id="log-body"></tbody>
+        </table>
+        <div class="empty-log" id="empty-log">No rolls yet — the table is waiting.</div>
+      </div>
+    </div>
+
+    <span class="leave-link" id="leave-link">Leave table</span>
+  </div>
+</div>
+
+<!--
+  =====================================================================
+  FIREBASE SETUP — fill in your own project's config below before use.
+  See the setup steps you were given alongside this file.
+  =====================================================================
+-->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
+import {
+  getDatabase, ref, push, onValue, off, query, limitToLast,
+  onDisconnect, set, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-database.js";
+
+// ---------------------------------------------------------------
+// PASTE YOUR OWN FIREBASE CONFIG HERE (Project settings > General > Your apps)
+// ---------------------------------------------------------------
+const firebaseConfig = {
+  apiKey: "PASTE_YOUR_API_KEY",
+  authDomain: "PASTE_YOUR_PROJECT.firebaseapp.com",
+  databaseURL: "https://dnd-dice-table-default-rtdb.firebaseio.com",
+  projectId: "PASTE_YOUR_PROJECT",
+};
+
+let app, db, dbReady = false;
+try{
+  app = initializeApp(firebaseConfig);
+  db = getDatabase(app);
+  dbReady = true;
+}catch(e){
+  console.error("Firebase failed to initialize — check your config.", e);
+}
+
+(function(){
+
+  // ---------------- die visuals ----------------
+  const DICE = [
+    { sides:4,   color:'#a4443f', text:'#f4e9e4' },
+    { sides:6,   color:'#3f5f8a', text:'#eaf0f9' },
+    { sides:8,   color:'#4d7d47', text:'#eef6ea' },
+    { sides:10,  color:'#e6e0d2', text:'#221c14' },
+    { sides:12,  color:'#221d18', text:'#c8a24d' },
+    { sides:20,  color:'#c8a24d', text:'#241c10' },
+    { sides:100, color:'#f2efe6', text:'#221c14' }
+  ];
+
+  function dieShapeSvg(sides, fill, textColor){
+    const label = sides === 100 ? '00' : String(sides);
+    let shape;
+    if(sides === 4){
+      shape = `<polygon points="50,10 90,88 10,88" fill="${fill}"/><line x1="50" y1="10" x2="50" y2="88" stroke="${textColor}" stroke-opacity=".25" stroke-width="2"/>`;
+    } else if(sides === 6){
+      shape = `<rect x="14" y="14" width="72" height="72" rx="10" fill="${fill}"/>`;
+    } else if(sides === 8){
+      shape = `<polygon points="50,6 94,50 50,94 6,50" fill="${fill}"/><line x1="50" y1="6" x2="50" y2="94" stroke="${textColor}" stroke-opacity=".2" stroke-width="2"/><line x1="6" y1="50" x2="94" y2="50" stroke="${textColor}" stroke-opacity=".2" stroke-width="2"/>`;
+    } else if(sides === 10){
+      shape = `<polygon points="50,6 84,38 70,94 30,94 16,38" fill="${fill}"/>`;
+    } else if(sides === 12){
+      shape = `<polygon points="50,4 87,20 98,58 74,90 26,90 2,58 13,20" fill="${fill}"/>`;
+    } else if(sides === 20){
+      shape = `<polygon points="50,4 93,27 93,73 50,96 7,73 7,27" fill="${fill}"/><polygon points="50,4 93,27 50,50" fill="${fill}" stroke="${textColor}" stroke-opacity=".18"/><polygon points="93,73 50,96 50,50" fill="${fill}" stroke="${textColor}" stroke-opacity=".18"/><polygon points="7,73 7,27 50,50" fill="${fill}" stroke="${textColor}" stroke-opacity=".18"/>`;
+    } else {
+      shape = `<circle cx="50" cy="50" r="46" fill="${fill}"/>`;
+    }
+    return `<svg viewBox="0 0 100 100">${shape}<text x="50" y="${sides===100?58:62}" text-anchor="middle" font-size="${sides===100?22:26}" font-family="Spectral, serif" font-weight="700" fill="${textColor}">${label}</text></svg>`;
+  }
+
+  // ---------------- state ----------------
+  let mode = 'solo';               // 'solo' | 'party'
+  let playerName = '';
+  let roomName = '';
+  let roomKey = '';                // sanitized room name used as the Firebase path
+  let selection = {};
+  let advState = 'none';
+  let historyCache = [];
+  let knownIds = new Set();        // for "fresh row" highlight
+  let roomListenerRef = null;
+
+  DICE.forEach(d => selection[d.sides] = 0);
+
+  function sanitizeRoomName(name){
+    // Firebase RTDB keys cannot contain . # $ [ ] / or whitespace
+    return name.trim().toLowerCase().replace(/[.#$\[\]\/\s]+/g, '-').slice(0, 60) || 'lobby';
+  }
+
+  // ---------------- landing wiring ----------------
+  const modeSolo = document.getElementById('mode-solo');
+  const modeParty = document.getElementById('mode-party');
+  const roomField = document.getElementById('room-field');
+  const nameInput = document.getElementById('name-input');
+  const roomInput = document.getElementById('room-input');
+  const enterBtn = document.getElementById('enter-btn');
+  const landingNote = document.getElementById('landing-note');
+  const connNote = document.getElementById('conn-note');
+
+  if(!dbReady){
+    connNote.textContent = 'Firebase is not configured yet — solo table still works, shared tables will not sync.';
+    connNote.classList.add('bad');
+  }
+
+  modeSolo.addEventListener('click', () => {
+    mode = 'solo';
+    modeSolo.classList.add('active');
+    modeParty.classList.remove('active');
+    roomField.style.display = 'none';
+    landingNote.textContent = 'Rolls are saved to this browser only.';
+  });
+  modeParty.addEventListener('click', () => {
+    mode = 'party';
+    modeParty.classList.add('active');
+    modeSolo.classList.remove('active');
+    roomField.style.display = 'block';
+    landingNote.textContent = 'Anyone who opens the same room name sees rolls appear live.';
+  });
+
+  enterBtn.addEventListener('click', () => {
+    const n = nameInput.value.trim();
+    playerName = n || 'Adventurer';
+    if(mode === 'party'){
+      roomName = roomInput.value.trim();
+      if(!roomName){
+        roomInput.focus();
+        roomInput.style.borderColor = 'var(--red-bright)';
+        return;
+      }
+      roomKey = sanitizeRoomName(roomName);
+      if(!dbReady){
+        connNote.textContent = 'Cannot open a shared table — Firebase config is missing.';
+        connNote.classList.add('bad');
+        return;
+      }
+    }
+    enterGame();
+  });
+
+  // ---------------- build dice tray ----------------
+  const diceTray = document.getElementById('dice-tray');
+  DICE.forEach(d => {
+    const btn = document.createElement('button');
+    btn.className = 'die-btn';
+    btn.type = 'button';
+    btn.dataset.sides = d.sides;
+    btn.innerHTML = dieShapeSvg(d.sides, d.color, d.text) + `<span class="count-chip">0</span>`;
+    btn.addEventListener('click', () => {
+      selection[d.sides]++;
+      renderSelection();
+    });
+    diceTray.appendChild(btn);
+  });
+
+  function renderSelection(){
+    const box = document.getElementById('selection-box');
+    box.innerHTML = '';
+    let total = 0;
+    DICE.forEach(d => {
+      const btn = diceTray.querySelector(`.die-btn[data-sides="${d.sides}"]`);
+      const chip = btn.querySelector('.count-chip');
+      const c = selection[d.sides];
+      chip.textContent = c;
+      btn.classList.toggle('has-count', c > 0);
+      total += c;
+      if(c > 0){
+        const sel = document.createElement('div');
+        sel.className = 'sel-chip';
+        sel.innerHTML = `<span>d${d.sides} &times; ${c}</span>`;
+        const rm = document.createElement('button');
+        rm.type = 'button';
+        rm.textContent = '\u2715';
+        rm.addEventListener('click', () => { selection[d.sides]--; renderSelection(); });
+        sel.appendChild(rm);
+        box.appendChild(sel);
+      }
+    });
+    box.classList.toggle('empty', total === 0);
+    document.getElementById('roll-btn').disabled = total === 0;
+    updateAdvAvailability(total);
+  }
+
+  document.getElementById('clear-btn').addEventListener('click', () => {
+    DICE.forEach(d => selection[d.sides] = 0);
+    renderSelection();
+  });
+
+  // ---------------- advantage / disadvantage ----------------
+  const advBtn = document.getElementById('adv-btn');
+  const disBtn = document.getElementById('dis-btn');
+
+  function updateAdvAvailability(total){
+    const eligible = total === 1;
+    advBtn.style.opacity = eligible ? '1' : '.4';
+    disBtn.style.opacity = eligible ? '1' : '.4';
+    if(!eligible){ advState = 'none'; advBtn.classList.remove('on-adv'); disBtn.classList.remove('on-dis'); }
+  }
+
+  advBtn.addEventListener('click', () => {
+    const total = Object.values(selection).reduce((a,b)=>a+b,0);
+    if(total !== 1) return;
+    advState = advState === 'adv' ? 'none' : 'adv';
+    advBtn.classList.toggle('on-adv', advState === 'adv');
+    disBtn.classList.remove('on-dis');
+  });
+  disBtn.addEventListener('click', () => {
+    const total = Object.values(selection).reduce((a,b)=>a+b,0);
+    if(total !== 1) return;
+    advState = advState === 'dis' ? 'none' : 'dis';
+    disBtn.classList.toggle('on-dis', advState === 'dis');
+    advBtn.classList.remove('on-adv');
+  });
+
+  // ---------------- rolling ----------------
+  function rollDie(sides){ return 1 + Math.floor(Math.random() * sides); }
+
+  function performRoll(){
+    const groups = DICE.filter(d => selection[d.sides] > 0)
+                        .map(d => ({ sides:d.sides, count:selection[d.sides] }));
+    const modifier = parseInt(document.getElementById('modifier-input').value, 10) || 0;
+    const notation = groups.map(g => `${g.count}d${g.sides}`).join('+');
+
+    function rollOnce(){
+      const rolls = [];
+      let sum = 0;
+      groups.forEach(g => {
+        for(let i=0;i<g.count;i++){
+          const r = rollDie(g.sides);
+          rolls.push(r);
+          sum += r;
+        }
+      });
+      return { rolls, sum, total: sum + modifier };
+    }
+
+    const useAdv = advState !== 'none' && groups.reduce((a,g)=>a+g.count,0) === 1;
+
+    if(useAdv){
+      const a = rollOnce();
+      const b = rollOnce();
+      const keepA = advState === 'adv' ? a.total >= b.total : a.total <= b.total;
+      const kept = keepA ? a : b;
+      const discarded = keepA ? b : a;
+      showResult({ notation, modifier, kept, discarded, advMode: advState });
+      submitRoll({ notation, modifier, total: kept.total, rolls: kept.rolls, tag: advState });
+    } else {
+      const r = rollOnce();
+      showResult({ notation, modifier, kept: r, discarded: null, advMode: 'none' });
+      submitRoll({ notation, modifier, total: r.total, rolls: r.rolls, tag: 'none' });
+    }
+  }
+
+  function showResult({ notation, modifier, kept, discarded, advMode }){
+    const panel = document.getElementById('result-panel');
+    panel.style.display = 'block';
+    const modStr = modifier >= 0 ? `+${modifier}` : `${modifier}`;
+    document.getElementById('result-line').innerHTML =
+      `<b>${notation}</b>, modifier ${modStr}, final <b>${kept.total}</b>` +
+      (advMode !== 'none' ? ` <span class="${advMode==='adv'?'tag-adv':'tag-dis'}">${advMode==='adv'?'kept the higher roll':'kept the lower roll'}</span>` : '');
+
+    const row = document.getElementById('result-total-row');
+    row.innerHTML = '';
+
+    function card(label, data, cls){
+      const el = document.createElement('div');
+      el.className = 'result-card ' + cls;
+      el.innerHTML = `<div class="rc-label">${label}</div><div class="rc-total">${data.total}</div><div class="rc-detail">rolled ${data.rolls.join(', ')}${modifier?` &nbsp;${modifier>=0?'+':''}${modifier}`:''}</div>`;
+      return el;
+    }
+
+    if(discarded){
+      row.appendChild(card('Kept', kept, 'kept'));
+      row.appendChild(card('Discarded', discarded, 'discarded'));
+    } else {
+      row.appendChild(card(notation, kept, 'kept'));
+    }
+  }
+
+  document.getElementById('roll-btn').addEventListener('click', performRoll);
+
+  // ---------------- persistence: solo = localStorage, party = Firebase Realtime DB ----------------
+  function soloKey(){ return `dice-table:solo:${playerName}:log`; }
+
+  function loadSoloHistory(){
+    try{
+      const raw = localStorage.getItem(soloKey());
+      historyCache = raw ? JSON.parse(raw) : [];
+    }catch(e){
+      historyCache = [];
+    }
+    knownIds = new Set(historyCache.map(e => e.id));
+    renderLog();
+  }
+
+  function saveSoloHistory(){
+    try{
+      localStorage.setItem(soloKey(), JSON.stringify(historyCache));
+    }catch(e){
+      console.error('Could not save roll log locally', e);
+    }
+  }
+
+  function submitRoll({ notation, modifier, total, rolls, tag }){
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(36).slice(2,8)}`,
+      time: new Date().toLocaleTimeString([], { hour:'2-digit', minute:'2-digit' }),
+      player: playerName,
+      notation, modifier, total, rolls, tag
+    };
+
+    if(mode === 'party' && dbReady){
+      // Written to Firebase; the onValue listener below re-renders every
+      // connected browser (including this one) the instant it arrives.
+      const logRef = ref(db, `rooms/${roomKey}/log`);
+      push(logRef, entry).catch(err => console.error('Could not send roll to room', err));
+    } else {
+      historyCache.unshift(entry);
+      if(historyCache.length > 200) historyCache.length = 200;
+      knownIds.add(entry.id);
+      renderLog(entry.id);
+      saveSoloHistory();
+    }
+  }
+
+  function attachRoomListener(){
+    const logQuery = query(ref(db, `rooms/${roomKey}/log`), limitToLast(200));
+    roomListenerRef = logQuery;
+    onValue(logQuery, snapshot => {
+      const val = snapshot.val() || {};
+      const entries = Object.values(val).sort((a, b) => {
+        // sort newest first; fall back to id's leading timestamp
+        const ta = parseInt(a.id, 10) || 0;
+        const tb = parseInt(b.id, 10) || 0;
+        return tb - ta;
+      });
+      const freshId = entries.find(e => !knownIds.has(e.id))?.id || null;
+      entries.forEach(e => knownIds.add(e.id));
+      historyCache = entries;
+      renderLog(freshId);
+    }, err => {
+      console.error('Room sync error', err);
+      document.getElementById('room-sub').textContent = `Shared table \u00b7 room "${roomName}" \u00b7 connection lost`;
+    });
+  }
+
+  function detachRoomListener(){
+    if(roomListenerRef){ off(roomListenerRef); roomListenerRef = null; }
+  }
+
+  function renderLog(highlightId){
+    const body = document.getElementById('log-body');
+    const empty = document.getElementById('empty-log');
+    const countEl = document.getElementById('log-count');
+    body.innerHTML = '';
+    countEl.textContent = historyCache.length ? `${historyCache.length} roll${historyCache.length===1?'':'s'}` : '';
+    document.getElementById('log-player-head').style.display = mode === 'party' ? '' : 'none';
+
+    if(!historyCache.length){
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    historyCache.forEach(e => {
+      const tr = document.createElement('tr');
+      if(highlightId && e.id === highlightId) tr.classList.add('fresh-row');
+      const modStr = e.modifier >= 0 ? `+${e.modifier}` : `${e.modifier}`;
+      const tag = e.tag === 'adv' ? '<span class="tag-adv">adv</span>' : e.tag === 'dis' ? '<span class="tag-dis">dis</span>' : '';
+      tr.innerHTML = `
+        <td class="mono">${e.time}</td>
+        ${mode==='party' ? `<td>${escapeHtml(e.player)}</td>` : ''}
+        <td class="mono">${e.notation}${tag}</td>
+        <td class="mono">${modStr}</td>
+        <td class="total-cell">${e.total}</td>
+      `;
+      body.appendChild(tr);
+    });
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------------- entering the game screen ----------------
+  function enterGame(){
+    document.getElementById('landing').style.display = 'none';
+    document.getElementById('game').style.display = 'block';
+
+    document.getElementById('player-badge').firstChild.textContent =
+      playerName.slice(0,2).toUpperCase();
+    document.getElementById('player-badge').title = playerName;
+    document.getElementById('badge-pip').className = 'pip ' + (mode === 'solo' ? 'solo' : '');
+
+    document.getElementById('room-sub').textContent =
+      mode === 'party' ? `Shared table \u00b7 room "${roomName}"` : 'Solo table';
+
+    renderSelection();
+    historyCache = [];
+    knownIds = new Set();
+
+    if(mode === 'party'){
+      attachRoomListener();
+    } else {
+      loadSoloHistory();
+    }
+  }
+
+  document.getElementById('leave-link').addEventListener('click', () => {
+    detachRoomListener();
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('landing').style.display = 'flex';
+    document.getElementById('result-panel').style.display = 'none';
+    DICE.forEach(d => selection[d.sides] = 0);
+    advState = 'none';
+    advBtn.classList.remove('on-adv');
+    disBtn.classList.remove('on-dis');
+    document.getElementById('modifier-input').value = 0;
+  });
+
+})();
+</script>
+</body>
+</html>
