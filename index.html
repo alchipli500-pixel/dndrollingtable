@@ -227,7 +227,7 @@
   #log-panel .panel-label{ display:flex; justify-content:space-between; align-items:center; margin-right:8px;}
   .log-count{ color:var(--text-dim); font-weight:400; text-transform:none; letter-spacing:0; }
   .log-table-wrap{ overflow-x:auto; }
-  table.log-table{ width:100%; border-collapse:collapse; font-size:13px; min-width:520px; }
+  table.log-table{ width:100%; border-collapse:collapse; font-size:13px; min-width:600px; }
   table.log-table th{
     text-align:left; color:var(--text-faint); font-weight:600; text-transform:uppercase; font-size:10.5px;
     letter-spacing:.06em; padding:8px 10px; border-bottom:1px solid var(--border);
@@ -344,7 +344,7 @@
       <div class="log-table-wrap">
         <table class="log-table" id="log-table">
           <thead>
-            <tr><th>Time</th><th id="log-player-head">Player</th><th>Roll</th><th>Mod</th><th>Total</th></tr>
+            <tr><th>Time</th><th id="log-player-head">Player</th><th>Roll</th><th>Rolled</th><th>Mod</th><th>Total</th></tr>
           </thead>
           <tbody id="log-body"></tbody>
         </table>
@@ -601,6 +601,10 @@ try{
       showResult({ notation, modifier, kept: r, discarded: null, advMode: 'none' });
       submitRoll({ notation, modifier, total: r.total, rolls: r.rolls, tag: 'none' });
     }
+
+    // Reset the modifier back to 0 after every roll so players don't
+    // accidentally carry a leftover +x into their next roll.
+    document.getElementById('modifier-input').value = 0;
   }
 
   function showResult({ notation, modifier, kept, discarded, advMode }){
@@ -679,17 +683,22 @@ try{
     const logQuery = query(ref(db, `rooms/${roomKey}/log`), limitToLast(200));
     roomListenerRef = logQuery;
     onValue(logQuery, snapshot => {
-      const val = snapshot.val() || {};
-      const entries = Object.values(val).sort((a, b) => {
-        // sort newest first; fall back to id's leading timestamp
-        const ta = parseInt(a.id, 10) || 0;
-        const tb = parseInt(b.id, 10) || 0;
-        return tb - ta;
+      // Order by Firebase's own push key rather than each player's device
+      // clock: push keys are generated using the server-synced time, so the
+      // order stays correct even when players are in different time zones
+      // or have their device clock set incorrectly. snapshot.forEach walks
+      // children oldest-to-newest by key, so we reverse for newest-first.
+      const entries = [];
+      snapshot.forEach(child => {
+        const val = child.val() || {};
+        val._key = child.key;
+        entries.push(val);
       });
-      const freshId = entries.find(e => !knownIds.has(e.id))?.id || null;
-      entries.forEach(e => knownIds.add(e.id));
+      entries.reverse();
+      const freshEntry = entries.find(e => !knownIds.has(e._key));
+      entries.forEach(e => knownIds.add(e._key));
       historyCache = entries;
-      renderLog(freshId);
+      renderLog(freshEntry ? freshEntry._key : null);
     }, err => {
       console.error('Room sync error', err);
       document.getElementById('room-sub').textContent = `Shared table \u00b7 room "${roomName}" \u00b7 connection lost`;
@@ -716,13 +725,14 @@ try{
 
     historyCache.forEach(e => {
       const tr = document.createElement('tr');
-      if(highlightId && e.id === highlightId) tr.classList.add('fresh-row');
+      if(highlightId && (e._key || e.id) === highlightId) tr.classList.add('fresh-row');
       const modStr = e.modifier >= 0 ? `+${e.modifier}` : `${e.modifier}`;
       const tag = e.tag === 'adv' ? '<span class="tag-adv">adv</span>' : e.tag === 'dis' ? '<span class="tag-dis">dis</span>' : '';
       tr.innerHTML = `
         <td class="mono">${e.time}</td>
         ${mode==='party' ? `<td>${escapeHtml(e.player)}</td>` : ''}
         <td class="mono">${e.notation}${tag}</td>
+        <td class="mono">${(e.rolls || []).join(', ')}</td>
         <td class="mono">${modStr}</td>
         <td class="total-cell">${e.total}</td>
       `;
